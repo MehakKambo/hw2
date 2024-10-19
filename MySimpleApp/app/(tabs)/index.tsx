@@ -1,70 +1,163 @@
-import { Image, StyleSheet, Platform } from 'react-native';
-
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import React, { useState, useEffect } from 'react';
+import { View, Button, Switch, Text, StyleSheet, Image, Alert, Linking } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function HomeScreen() {
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [imageUri, setImageUri] = useState<string | null>(null);
+
+  // Dark Mode
+  const toggleSwitch = async () => {
+    const newValue = !isDarkMode;
+    setIsDarkMode(newValue);
+    try {
+      await AsyncStorage.setItem('darkMode', JSON.stringify(newValue));
+      alert('Dark Mode settings saved!');
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // Load dark mode preference from local storage on app startup
+  const loadDarkModePreference = async () => {
+    try {
+      const value = await AsyncStorage.getItem('darkMode');
+      if (value !== null) {
+        const savedValue = JSON.parse(value);
+        setIsDarkMode(savedValue);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // Pick an image from the user's gallery
+  const pickImage = async () => {
+    let result = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!result.granted) {
+      // Show an alert with options to try again or exit
+      Alert.alert(
+        "Permission Required",
+        "You won't be able to use this app without media library access. Please grant permission to proceed.",
+        [
+          {
+            text: "Try Again",
+            onPress: async () => {
+              // Re-request permission
+              const newResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (!newResult.granted) {
+                // Still denied, show the same alert again
+                pickImage();
+              }
+            },
+          },
+          {
+            text: "Go to Settings",
+            onPress: () => Linking.openSettings(),  // Open device settings so user can grant permission
+            style: "cancel",
+          },
+        ],
+        { cancelable: false }
+      );
+      return;
+    }
+
+    let pickedImage = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 1,
+    });
+
+    if (!pickedImage.canceled && pickedImage.assets && pickedImage.assets.length > 0) {
+      saveImageLocally(pickedImage.assets[0].uri);
+    }
+  };
+
+  // Save image locally using FileSystem
+  const saveImageLocally = async (uri: string) => {
+    const fileName = uri.split('/').pop();  // Get the file name from URI
+    const newUri = `${FileSystem.documentDirectory}${fileName}`;  // Create a new file path in local storage
+    await FileSystem.moveAsync({
+      from: uri,
+      to: newUri,
+    });
+    setImageUri(newUri);  // Store and display the saved image
+    alert('Image saved locally!');
+    await AsyncStorage.setItem('savedImage', newUri);  // Save image URI in AsyncStorage
+  };
+
+  // Load the saved image URI from AsyncStorage
+  const loadImage = async () => {
+    try {
+      const savedUri = await AsyncStorage.getItem('savedImage');
+      if (savedUri) {
+        setImageUri(savedUri);  // Display the saved image if it exists
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // Load dark mode preference and image on app startup
+  useEffect(() => {
+    loadDarkModePreference();
+    loadImage();
+  }, []);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({ ios: 'cmd + d', android: 'cmd + m' })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <View style={[styles.container, { backgroundColor: isDarkMode ? '#333' : '#fff' }]}>
+      <Text style={[styles.header, { color: isDarkMode ? '#fff' : '#000' }]}>1. Settings</Text>
+
+      {/* Dark Mode Toggle */}
+      <View style={styles.switchContainer}>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', width: '100%' }}>
+          <Text style={{ color: isDarkMode ? '#fff' : '#000' }}>Enable Dark Mode</Text>
+          <Switch
+            trackColor={{ false: "#767577", true: "#81b0ff" }}
+            thumbColor={isDarkMode ? "#f5dd4b" : "#f4f3f4"}
+            ios_backgroundColor="#3e3e3e"
+            onValueChange={toggleSwitch}
+            value={isDarkMode}
+            style={{ marginLeft: 20 }}
+          />
+        </View>
+      </View>
+
+      {/* Image Selection and Display */}
+      <Text style={[styles.header, { color: isDarkMode ? '#fff' : '#000' }]}>2. Media</Text>
+      <Button title="Pick and Save Image" onPress={pickImage} />
+      {imageUri && <Image source={{ uri: imageUri }} style={styles.image} />}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  header: {
+    fontSize: 24,
+    marginBottom: 20,
+  },
+  switchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    width: '100%',
+    padding: 10,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  storedSetting: {
+    marginVertical: 20,
+    fontSize: 16,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  image: {
+    width: 300,
+    height: 300,
+    marginTop: 30,
   },
 });
