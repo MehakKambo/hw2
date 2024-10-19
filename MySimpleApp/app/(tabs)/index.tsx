@@ -108,7 +108,7 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: isDarkMode ? '#333' : '#fff' }]}>
-      <Text style={[styles.header, { color: isDarkMode ? '#fff' : '#000' }]}>1. Settings Storage</Text>
+      <Text style={[styles.header, { color: isDarkMode ? '#fff' : '#000' }]}>1. Settings</Text>
 
       {/* Dark Mode Toggle */}
       <View style={styles.switchContainer}>
@@ -126,7 +126,7 @@ export default function HomeScreen() {
       </View>
 
       {/* Image Selection and Display */}
-      <Text style={[styles.header, { color: isDarkMode ? '#fff' : '#000' }]}>2. Media Storage</Text>
+      <Text style={[styles.header, { color: isDarkMode ? '#fff' : '#000' }]}>2. Media</Text>
       <Button title="Pick and Save Image" onPress={pickImage} />
       {imageUri && <Image source={{ uri: imageUri }} style={styles.image} />}
     </View>
